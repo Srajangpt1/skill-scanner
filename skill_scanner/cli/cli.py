@@ -564,8 +564,8 @@ def scan_all_command(args: argparse.Namespace) -> int:
 
 def scan_repo_command(args: argparse.Namespace) -> int:
     """Handle the ``scan-repo`` command -- clone a GitHub repo and scan it."""
-    from ..core.repo_fetcher import clone_repo, resolve_repo_url
     from ..core.exceptions import RepoFetchError
+    from ..core.repo_fetcher import clone_repo, resolve_repo_url
 
     status = _make_status_printer(args)
 

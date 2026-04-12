@@ -32,7 +32,6 @@ import pytest
 from skill_scanner.core.exceptions import RepoFetchError
 from skill_scanner.core.repo_fetcher import clone_repo, resolve_repo_url
 
-
 # ---------------------------------------------------------------------------
 # resolve_repo_url
 # ---------------------------------------------------------------------------
