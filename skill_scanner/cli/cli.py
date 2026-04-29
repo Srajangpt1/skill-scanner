@@ -937,9 +937,8 @@ def _add_common_scan_flags(parser: argparse.ArgumentParser) -> None:
         "--lenient",
         action="store_true",
         help=(
-            "Tolerate malformed skills: coerce bad fields, fill defaults, and continue instead of failing. "
-            "When SKILL.md is absent, falls back to scanning .md files in the directory as instruction bodies "
-            "(supports non-Codex/Cursor formats such as Claude Code commands)."
+            "Tolerate malformed YAML / missing fields: coerce bad fields, fill defaults, and continue "
+            "instead of failing. Binary and non-UTF-8 files always fail."
         ),
     )
     parser.add_argument(
@@ -1012,7 +1011,13 @@ Examples:
     # -- scan-repo ---------------------------------------------------------
     scan_repo_p = subparsers.add_parser("scan-repo", help="Clone and scan a GitHub repository for skills")
     scan_repo_p.add_argument("repo", help="GitHub repo URL (https://github.com/owner/repo) or shorthand (owner/repo)")
-    scan_repo_p.add_argument("--recursive", "-r", action="store_true", default=True, help="Recursively search for skills (default: True)")
+    scan_repo_p.add_argument(
+        "--recursive",
+        "-r",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Recursively search for skills (default: True; use --no-recursive to disable)",
+    )
     scan_repo_p.add_argument("--check-overlap", action="store_true", help="Enable cross-skill description overlap check")
     _add_common_scan_flags(scan_repo_p)
 

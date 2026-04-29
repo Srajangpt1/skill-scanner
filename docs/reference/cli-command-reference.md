@@ -50,7 +50,8 @@ Command: `python -m skill_scanner.cli.cli --help`
 
 ```text
 usage: cli.py [-h] [--version]
-              {scan,scan-all,scan-repo,list-analyzers,validate-rules,generate-policy,configure-policy,interactive} ...
+              {scan,scan-all,scan-repo,list-analyzers,validate-rules,generate-policy,configure-policy,interactive}
+              ...
 
 Skill Scanner - Security scanner for agent skills packages
 
@@ -122,7 +123,8 @@ options:
                         multiple times to produce several reports in one run,
                         e.g. --format markdown --format sarif. Use 'sarif' for
                         GitHub Code Scanning, 'html' for interactive report.
-  --output, -o OUTPUT   Default output file path (overridden by --output-<fmt>
+  --output OUTPUT, -o OUTPUT
+                        Default output file path (overridden by --output-<fmt>
                         for a specific format)
   --output-json OUTPUT_JSON
                         Write JSON report to this file
@@ -169,11 +171,9 @@ options:
   --policy PRESET_OR_PATH
                         Scan policy: preset name (strict, balanced,
                         permissive) or path to custom YAML
-  --lenient             Tolerate malformed skills: coerce bad fields, fill
-                        defaults, and continue instead of failing. When
-                        SKILL.md is absent, falls back to scanning .md files
-                        in the directory as instruction bodies (supports non-
-                        Codex/Cursor formats such as Claude Code commands).
+  --lenient             Tolerate malformed YAML / missing fields: coerce bad
+                        fields, fill defaults, and continue instead of
+                        failing. Binary and non-UTF-8 files always fail.
   --skill-file FILENAME
                         Custom metadata filename to use instead of SKILL.md
                         (e.g. README.md)
@@ -235,7 +235,8 @@ options:
                         multiple times to produce several reports in one run,
                         e.g. --format markdown --format sarif. Use 'sarif' for
                         GitHub Code Scanning, 'html' for interactive report.
-  --output, -o OUTPUT   Default output file path (overridden by --output-<fmt>
+  --output OUTPUT, -o OUTPUT
+                        Default output file path (overridden by --output-<fmt>
                         for a specific format)
   --output-json OUTPUT_JSON
                         Write JSON report to this file
@@ -282,11 +283,9 @@ options:
   --policy PRESET_OR_PATH
                         Scan policy: preset name (strict, balanced,
                         permissive) or path to custom YAML
-  --lenient             Tolerate malformed skills: coerce bad fields, fill
-                        defaults, and continue instead of failing. When
-                        SKILL.md is absent, falls back to scanning .md files
-                        in the directory as instruction bodies (supports non-
-                        Codex/Cursor formats such as Claude Code commands).
+  --lenient             Tolerate malformed YAML / missing fields: coerce bad
+                        fields, fill defaults, and continue instead of
+                        failing. Binary and non-UTF-8 files always fail.
   --skill-file FILENAME
                         Custom metadata filename to use instead of SKILL.md
                         (e.g. README.md)
@@ -313,7 +312,8 @@ Command: `python -m skill_scanner.cli.cli scan-repo --help`
 <summary>Full <code>scan-repo</code> help output</summary>
 
 ```text
-usage: cli.py scan-repo [-h] [--recursive] [--check-overlap]
+usage: cli.py scan-repo [-h] [--recursive | --no-recursive | -r]
+                        [--check-overlap]
                         [--format {summary,json,markdown,table,sarif,html}]
                         [--output OUTPUT] [--output-json OUTPUT_JSON]
                         [--output-sarif OUTPUT_SARIF]
@@ -342,14 +342,17 @@ positional arguments:
 
 options:
   -h, --help            show this help message and exit
-  --recursive, -r       Recursively search for skills (default: True)
+  --recursive, --no-recursive, -r
+                        Recursively search for skills (default: True; use
+                        --no-recursive to disable)
   --check-overlap       Enable cross-skill description overlap check
   --format {summary,json,markdown,table,sarif,html}
                         Output format (default: summary). May be specified
                         multiple times to produce several reports in one run,
                         e.g. --format markdown --format sarif. Use 'sarif' for
                         GitHub Code Scanning, 'html' for interactive report.
-  --output, -o OUTPUT   Default output file path (overridden by --output-<fmt>
+  --output OUTPUT, -o OUTPUT
+                        Default output file path (overridden by --output-<fmt>
                         for a specific format)
   --output-json OUTPUT_JSON
                         Write JSON report to this file
@@ -396,11 +399,9 @@ options:
   --policy PRESET_OR_PATH
                         Scan policy: preset name (strict, balanced,
                         permissive) or path to custom YAML
-  --lenient             Tolerate malformed skills: coerce bad fields, fill
-                        defaults, and continue instead of failing. When
-                        SKILL.md is absent, falls back to scanning .md files
-                        in the directory as instruction bodies (supports non-
-                        Codex/Cursor formats such as Claude Code commands).
+  --lenient             Tolerate malformed YAML / missing fields: coerce bad
+                        fields, fill defaults, and continue instead of
+                        failing. Binary and non-UTF-8 files always fail.
   --skill-file FILENAME
                         Custom metadata filename to use instead of SKILL.md
                         (e.g. README.md)
@@ -451,7 +452,8 @@ usage: cli.py generate-policy [-h] [--output OUTPUT]
 
 options:
   -h, --help            show this help message and exit
-  --output, -o OUTPUT   Output file path
+  --output OUTPUT, -o OUTPUT
+                        Output file path
   --preset {strict,balanced,permissive}
                         Base preset
 ```
@@ -469,9 +471,11 @@ Command: `python -m skill_scanner.cli.cli configure-policy --help`
 usage: cli.py configure-policy [-h] [--output OUTPUT] [--input INPUT]
 
 options:
-  -h, --help           show this help message and exit
-  --output, -o OUTPUT  Output file path
-  --input, -i INPUT    Load existing policy YAML for editing
+  -h, --help            show this help message and exit
+  --output OUTPUT, -o OUTPUT
+                        Output file path
+  --input INPUT, -i INPUT
+                        Load existing policy YAML for editing
 ```
 
 </details>

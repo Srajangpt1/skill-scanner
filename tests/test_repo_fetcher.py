@@ -24,6 +24,7 @@ behaviour (success, failure, git-not-found, and cleanup).
 from __future__ import annotations
 
 import shutil
+import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -55,9 +56,19 @@ class TestResolveRepoUrl:
         with pytest.raises(RepoFetchError):
             resolve_repo_url("not-a-repo")
 
-    def test_non_github_http_url_returned_as_is(self):
-        url = "https://other.com/owner/repo"
+    def test_github_url_with_trailing_slash_returned_as_is(self):
+        url = "https://github.com/owner/repo/"
         assert resolve_repo_url(url) == url
+
+    def test_non_github_http_url_raises_repo_fetch_error(self):
+        url = "https://other.com/owner/repo"
+        with pytest.raises(RepoFetchError):
+            resolve_repo_url(url)
+
+    @pytest.mark.parametrize("repo", ["httpfoobar", "httpx://github.com/owner/repo", "http://github.com/owner/repo"])
+    def test_invalid_http_like_reference_raises_repo_fetch_error(self, repo: str):
+        with pytest.raises(RepoFetchError):
+            resolve_repo_url(repo)
 
 
 # ---------------------------------------------------------------------------
@@ -75,12 +86,17 @@ class TestCloneRepo:
 
         with (
             patch("skill_scanner.core.repo_fetcher.tempfile.mkdtemp", return_value=str(tmp_path)),
-            patch("skill_scanner.core.repo_fetcher.subprocess.run", return_value=mock_result),
+            patch("skill_scanner.core.repo_fetcher.subprocess.run", return_value=mock_result) as mock_run,
             patch("skill_scanner.core.repo_fetcher.shutil.rmtree") as mock_rmtree,
         ):
             with clone_repo("https://github.com/owner/repo") as cloned_path:
                 assert isinstance(cloned_path, Path)
                 assert cloned_path == tmp_path
+                mock_run.assert_called_once_with(
+                    ["git", "clone", "--depth=1", "--", "https://github.com/owner/repo", str(tmp_path)],
+                    capture_output=True,
+                    timeout=120,
+                )
 
             # Cleanup must always be called
             mock_rmtree.assert_called_once_with(str(tmp_path), ignore_errors=True)
@@ -115,6 +131,38 @@ class TestCloneRepo:
 
         assert "PATH" in str(exc_info.value)
 
+    def test_clone_timeout_raises_repo_fetch_error(self, tmp_path: Path):
+        """When git clone times out, RepoFetchError is raised instead of leaking subprocess errors."""
+        with (
+            patch("skill_scanner.core.repo_fetcher.tempfile.mkdtemp", return_value=str(tmp_path)),
+            patch(
+                "skill_scanner.core.repo_fetcher.subprocess.run",
+                side_effect=subprocess.TimeoutExpired(cmd="git clone", timeout=3),
+            ),
+            patch("skill_scanner.core.repo_fetcher.shutil.rmtree"),
+        ):
+            with pytest.raises(RepoFetchError) as exc_info:
+                with clone_repo("https://github.com/owner/repo", timeout=3):
+                    pass
+
+        assert "timed out after 3s" in str(exc_info.value)
+
+    def test_clone_subprocess_error_raises_repo_fetch_error(self, tmp_path: Path):
+        """Other subprocess failures are wrapped for consistent CLI handling."""
+        with (
+            patch("skill_scanner.core.repo_fetcher.tempfile.mkdtemp", return_value=str(tmp_path)),
+            patch(
+                "skill_scanner.core.repo_fetcher.subprocess.run",
+                side_effect=subprocess.SubprocessError("boom"),
+            ),
+            patch("skill_scanner.core.repo_fetcher.shutil.rmtree"),
+        ):
+            with pytest.raises(RepoFetchError) as exc_info:
+                with clone_repo("https://github.com/owner/repo"):
+                    pass
+
+        assert "boom" in str(exc_info.value)
+
     def test_cleanup_runs_even_on_clone_failure(self, tmp_path: Path):
         """shutil.rmtree is called even when clone fails."""
         mock_result = MagicMock()
@@ -144,3 +192,14 @@ class TestCloneRepo:
                     pass
 
         mock_rmtree.assert_called_once_with(str(tmp_path), ignore_errors=True)
+
+    def test_temp_directory_removed_on_success(self):
+        """A real temporary clone directory is removed after a successful context exit."""
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+
+        with patch("skill_scanner.core.repo_fetcher.subprocess.run", return_value=mock_result):
+            with clone_repo("https://github.com/owner/repo") as cloned_path:
+                assert cloned_path.exists()
+
+            assert not cloned_path.exists()

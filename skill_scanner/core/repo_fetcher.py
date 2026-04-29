@@ -29,10 +29,12 @@ import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import urlparse
 
 from skill_scanner.core.exceptions import RepoFetchError
 
 _SHORTHAND_RE = re.compile(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$")
+_GITHUB_PATH_RE = re.compile(r"^/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+(?:\.git)?/?$")
 
 
 def resolve_repo_url(repo: str) -> str:
@@ -51,15 +53,32 @@ def resolve_repo_url(repo: str) -> str:
     Raises:
         RepoFetchError: If *repo* does not match a recognised format.
     """
-    if repo.startswith("http"):
-        return repo
+    parsed = urlparse(repo)
+    if parsed.scheme or parsed.netloc:
+        if (
+            parsed.scheme == "https"
+            and parsed.netloc.lower() == "github.com"
+            and not parsed.username
+            and not parsed.password
+            and not parsed.params
+            and not parsed.query
+            and not parsed.fragment
+            and _GITHUB_PATH_RE.match(parsed.path)
+        ):
+            return repo
+
+        raise RepoFetchError(
+            f"Invalid repository reference {repo!r}. "
+            "Expected a GitHub HTTPS URL (https://github.com/owner/repo) "
+            "or an owner/repo shorthand."
+        )
 
     if _SHORTHAND_RE.match(repo):
         return f"https://github.com/{repo}"
 
     raise RepoFetchError(
         f"Invalid repository reference {repo!r}. "
-        "Expected a full GitHub URL (https://github.com/owner/repo) "
+        "Expected a GitHub HTTPS URL (https://github.com/owner/repo) "
         "or an owner/repo shorthand."
     )
 
@@ -87,7 +106,7 @@ def clone_repo(url: str, timeout: int = 120) -> Iterator[Path]:
     try:
         try:
             result = subprocess.run(
-                ["git", "clone", "--depth=1", url, tmpdir],
+                ["git", "clone", "--depth=1", "--", url, tmpdir],
                 capture_output=True,
                 timeout=timeout,
             )
@@ -95,6 +114,10 @@ def clone_repo(url: str, timeout: int = 120) -> Iterator[Path]:
             raise RepoFetchError(
                 "git not found on PATH. Please install git and ensure it is available in your PATH."
             )
+        except subprocess.TimeoutExpired:
+            raise RepoFetchError(f"git clone timed out after {timeout}s for {url!r}")
+        except subprocess.SubprocessError as e:
+            raise RepoFetchError(f"git clone failed for {url!r}: {e}")
 
         if result.returncode != 0:
             stderr = result.stderr.decode(errors="replace").strip()

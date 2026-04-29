@@ -28,12 +28,10 @@ inside ``scan_repo_command`` resolves it.
 from __future__ import annotations
 
 import io
-import sys
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from pathlib import Path
-from unittest.mock import patch
-
-import pytest
+from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
 from skill_scanner.core.exceptions import RepoFetchError
 
@@ -59,12 +57,12 @@ def _fake_clone_raises(url: str, **kwargs):
     yield  # pragma: no cover – makes this a generator so @contextmanager is happy
 
 
-def _invoke_scan_repo(repo_arg: str) -> tuple[str, str, int]:
+def _invoke_scan_repo(*cli_args: str) -> tuple[str, str, int]:
     """Invoke scan_repo_command in-process, return (stdout, stderr, exit_code)."""
     from skill_scanner.cli.cli import build_parser, scan_repo_command
 
     parser = build_parser()
-    args = parser.parse_args(["scan-repo", repo_arg])
+    args = parser.parse_args(["scan-repo", *cli_args])
 
     stdout_buf = io.StringIO()
     stderr_buf = io.StringIO()
@@ -123,4 +121,48 @@ class TestScanRepoCommand:
 
         assert code == 1, (
             f"Expected exit 1 on clone failure, got {code}.\nstderr: {stderr}"
+        )
+        assert "clone failed" in stderr
+
+    def test_scan_repo_common_flags_pass_through_to_scanner(self):
+        """scan-repo forwards recursive and common scan flags to scan_directory."""
+        fake_report = SimpleNamespace(
+            total_skills_scanned=1,
+            scan_results=[],
+            cross_skill_findings=[],
+            total_findings=0,
+            critical_count=0,
+            high_count=0,
+            medium_count=0,
+            low_count=0,
+            info_count=0,
+            safe_count=0,
+        )
+        scanner = MagicMock()
+        scanner.scan_directory.return_value = fake_report
+
+        with (
+            patch("skill_scanner.core.repo_fetcher.clone_repo", _fake_clone_test_skills),
+            patch("skill_scanner.cli.cli.SkillScanner", return_value=scanner),
+            patch("skill_scanner.cli.cli._format_output", return_value="ok"),
+            patch("skill_scanner.cli.cli._write_output"),
+        ):
+            stdout, stderr, code = _invoke_scan_repo(
+                "owner/repo",
+                "--no-recursive",
+                "--check-overlap",
+                "--lenient",
+                "--skill-file",
+                "README.md",
+            )
+
+        assert code == 0, (
+            f"Expected exit 0, got {code}.\nstdout: {stdout}\nstderr: {stderr}"
+        )
+        scanner.scan_directory.assert_called_once_with(
+            _TEST_SKILLS_DIR,
+            recursive=False,
+            check_overlap=True,
+            lenient=True,
+            skill_file="README.md",
         )
